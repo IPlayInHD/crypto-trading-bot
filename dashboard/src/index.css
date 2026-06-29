@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-900 text-gray-100 antialiased;
+    font-family: 'Inter', 'SF Pro Display', system-ui, sans-serif;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-800;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-400 rounded-full;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-dark-700 border border-dark-500 rounded-xl p-4;
+  }
+
+  .stat-card {
+    @apply card flex flex-col gap-1;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-green {
+    @apply badge bg-green-500/20 text-green-400 border border-green-500/30;
+  }
+
+  .badge-red {
+    @apply badge bg-red-500/20 text-red-400 border border-red-500/30;
+  }
+
+  .badge-yellow {
+    @apply badge bg-yellow-500/20 text-yellow-400 border border-yellow-500/30;
+  }
+
+  .badge-blue {
+    @apply badge bg-blue-500/20 text-blue-400 border border-blue-500/30;
+  }
+
+  .badge-purple {
+    @apply badge bg-purple-500/20 text-purple-400 border border-purple-500/30;
+  }
+}
+
+/* Animated gradient for live indicator */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.live-indicator::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: pulse-ring 1.5s ease-out infinite;
+  background: currentColor;
+}
+
+/* Chart tooltip */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #1e2535 !important;
+  border: 1px solid #2d3748 !important;
+  border-radius: 8px !important;
+}
