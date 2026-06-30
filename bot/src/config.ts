@@ -7,11 +7,11 @@ export const config: Config = {
   rpcUrl: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
   walletPrivateKey: process.env.WALLET_PRIVATE_KEY || '',
   tradingMode: (process.env.TRADING_MODE as 'simulation' | 'live') || 'simulation',
-  minProfitUSD: parseFloat(process.env.MIN_PROFIT_USD || '0.10'),
-  maxTradeSizeSOL: parseFloat(process.env.MAX_TRADE_SIZE_SOL || '1.0'),
+  minProfitUSD: parseFloat(process.env.MIN_PROFIT_USD || '0.001'),
+  maxTradeSizeSOL: parseFloat(process.env.MAX_TRADE_SIZE_SOL || '0.5'),
   slippageBps: parseInt(process.env.SLIPPAGE_BPS || '50'),
   wsPort: parseInt(process.env.WS_PORT || '8080'),
-  scanIntervalMs: parseInt(process.env.SCAN_INTERVAL_MS || '2000'),
+  scanIntervalMs: parseInt(process.env.SCAN_INTERVAL_MS || '1000'),
   enabledDexes: ['Raydium', 'Orca', 'Meteora', 'Lifinity', 'Phoenix'],
 };
 
