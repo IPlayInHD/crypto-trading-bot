@@ -1,5 +1,5 @@
 import pandas as pd
-import pandas_ta as ta
+import ta
 import logging
 from typing import Dict
 
@@ -13,51 +13,28 @@ UNKNOWN       = "unknown"
 
 
 def detect(df: pd.DataFrame) -> str:
-    """
-    Classify market regime from hourly OHLCV.
-
-    Rules:
-    - ADX > 25 + EMA9 > EMA21  → TRENDING_UP
-    - ADX > 25 + EMA9 < EMA21  → TRENDING_DOWN
-    - BBW > 1.5 * median BBW   → VOLATILE  (sudden expansion)
-    - ADX < 20                 → RANGING
-    - else                     → RANGING (default safe choice)
-    """
     if df is None or len(df) < 30:
         return UNKNOWN
-
     try:
         df = df.copy()
+        df["adx"]      = ta.trend.ADXIndicator(df["high"], df["low"], df["close"], window=14).adx()
+        df["ema_fast"] = ta.trend.EMAIndicator(df["close"], window=9).ema_indicator()
+        df["ema_slow"] = ta.trend.EMAIndicator(df["close"], window=21).ema_indicator()
+        bb             = ta.volatility.BollingerBands(df["close"], window=20, window_dev=2)
+        df["bbw"]      = bb.bollinger_wband()
 
-        # ADX
-        adx_df = ta.adx(df["high"], df["low"], df["close"], length=14)
-        df["adx"] = adx_df[f"ADX_14"].values
-
-        # EMA
-        df["ema_fast"] = ta.ema(df["close"], length=9)
-        df["ema_slow"] = ta.ema(df["close"], length=21)
-
-        # Bollinger Band Width
-        bb = ta.bbands(df["close"], length=20, std=2.0)
-        df["bbw"] = bb["BBB_20_2.0"].values   # bandwidth column
-
-        last     = df.iloc[-1]
-        adx      = last["adx"]
-        ema_fast = last["ema_fast"]
-        ema_slow = last["ema_slow"]
-        bbw      = last["bbw"]
-        med_bbw  = df["bbw"].median()
+        last    = df.iloc[-1]
+        adx     = last["adx"]
+        bbw     = last["bbw"]
+        med_bbw = df["bbw"].median()
 
         if bbw > 1.5 * med_bbw:
             return VOLATILE
-
         if adx > 25:
-            return TRENDING_UP if ema_fast > ema_slow else TRENDING_DOWN
-
+            return TRENDING_UP if last["ema_fast"] > last["ema_slow"] else TRENDING_DOWN
         return RANGING
-
     except Exception as e:
-        log.debug("Regime detection error: %s", e)
+        log.debug("Regime error: %s", e)
         return UNKNOWN
 
 
