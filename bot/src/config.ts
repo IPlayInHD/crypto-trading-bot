@@ -8,7 +8,7 @@ export const config: Config = {
   walletPrivateKey: process.env.WALLET_PRIVATE_KEY || '',
   tradingMode: (process.env.TRADING_MODE as 'simulation' | 'live') || 'simulation',
   minProfitUSD: parseFloat(process.env.MIN_PROFIT_USD || '0.001'),
-  maxTradeSizeSOL: parseFloat(process.env.MAX_TRADE_SIZE_SOL || '0.5'),
+  maxTradeSizeSOL: parseFloat(process.env.MAX_TRADE_SIZE_SOL || '0.9'),
   slippageBps: parseInt(process.env.SLIPPAGE_BPS || '50'),
   wsPort: parseInt(process.env.WS_PORT || '8080'),
   scanIntervalMs: parseInt(process.env.SCAN_INTERVAL_MS || '500'),
