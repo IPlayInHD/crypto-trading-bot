@@ -1,5 +1,5 @@
 import { ArbitrageOpportunity, TokenInfo } from '../types';
-import { config, SCAN_PAIRS, TOKENS, TRIANGULAR_PATHS } from '../config';
+import { config, SCAN_PAIRS, TRIANGULAR_PATHS } from '../config';
 import { getJupiterQuote } from '../dex/jupiter';
 import { logger } from '../utils/logger';
 
@@ -25,76 +25,6 @@ function toUSD(amount: number, token: TokenInfo): number {
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// DEX labels used for simulated routing
-const DEX_POOL = ['Raydium', 'Orca', 'Meteora', 'Lifinity', 'Phoenix', 'Whirlpool'];
-
-function pickTwoDexes(): [string, string] {
-  const shuffled = [...DEX_POOL].sort(() => Math.random() - 0.5);
-  return [shuffled[0], shuffled[1]];
-}
-
-// Generate a realistic simulated opportunity based on real price data
-function generateSimulatedOpportunity(
-  tokenIn: TokenInfo,
-  tokenOut: TokenInfo,
-  realPrice: number,
-  tradeAmountUSD: number,
-  type: 'cross-dex' | 'triangular'
-): ArbitrageOpportunity {
-  const [buyDex, sellDex] = pickTwoDexes();
-
-  // Realistic spread: 0.05% – 0.4%
-  const spreadPct = 0.05 + Math.random() * 0.35;
-  const profitUSD = (tradeAmountUSD * spreadPct) / 100;
-
-  const confidence: 'low' | 'medium' | 'high' =
-    spreadPct > 0.25 ? 'high' : spreadPct > 0.12 ? 'medium' : 'low';
-
-  const buyPrice = realPrice;
-  const sellPrice = realPrice * (1 + spreadPct / 100);
-
-  return {
-    id: generateId(),
-    type,
-    tokenIn,
-    tokenOut,
-    buyDex,
-    sellDex,
-    buyPrice,
-    sellPrice,
-    priceDiffPct: spreadPct,
-    estimatedProfitUSD: profitUSD,
-    estimatedProfitPct: spreadPct,
-    tradeAmountUSD,
-    buyQuote: {
-      dex: buyDex,
-      inputMint: tokenIn.mint,
-      outputMint: tokenOut.mint,
-      inputAmount: String(Math.floor(toLamports(tradeAmountUSD / solPriceUSD, tokenIn.decimals))),
-      outputAmount: String(Math.floor(toLamports(tradeAmountUSD, tokenOut.decimals))),
-      pricePerToken: buyPrice,
-      fee: tradeAmountUSD * 0.0025,
-      priceImpact: 0.01,
-      route: [buyDex],
-      timestamp: Date.now(),
-    },
-    sellQuote: {
-      dex: sellDex,
-      inputMint: tokenOut.mint,
-      outputMint: tokenIn.mint,
-      inputAmount: String(Math.floor(toLamports(tradeAmountUSD, tokenOut.decimals))),
-      outputAmount: String(Math.floor(toLamports(tradeAmountUSD / solPriceUSD, tokenIn.decimals))),
-      pricePerToken: sellPrice,
-      fee: tradeAmountUSD * 0.0025,
-      priceImpact: 0.01,
-      route: [sellDex],
-      timestamp: Date.now(),
-    },
-    timestamp: Date.now(),
-    confidence,
-  };
 }
 
 async function scanCrossDexArbitrage(
@@ -124,21 +54,7 @@ async function scanCrossDexArbitrage(
     ),
   ]);
 
-  if (!directQuote || !indirectQuote) {
-    // Jupiter unavailable — emit a simulated opportunity so dashboard stays active
-    if (Math.random() < 0.3) {
-      return [
-        generateSimulatedOpportunity(
-          baseToken,
-          quoteToken,
-          solPriceUSD,
-          tradeAmountUSD,
-          'cross-dex'
-        ),
-      ];
-    }
-    return [];
-  }
+  if (!directQuote || !indirectQuote) return [];
 
   const outputFromBuy =
     parseInt(directQuote.outputAmount) / Math.pow(10, quoteToken.decimals);
@@ -149,10 +65,6 @@ async function scanCrossDexArbitrage(
   const profitUSD = toUSD(profitBase, baseToken);
   const profitPct = (profitBase / inputAmountBase) * 100;
 
-  const buyDex = directQuote.route[0] || 'Raydium';
-  const sellDex = indirectQuote.route[0] || 'Orca';
-
-  // Real opportunity found
   if (profitUSD > config.minProfitUSD && profitPct > 0) {
     const confidence: 'low' | 'medium' | 'high' =
       profitPct > 1.0 ? 'high' : profitPct > 0.3 ? 'medium' : 'low';
@@ -162,8 +74,8 @@ async function scanCrossDexArbitrage(
         type: 'cross-dex',
         tokenIn: baseToken,
         tokenOut: quoteToken,
-        buyDex,
-        sellDex,
+        buyDex: directQuote.route[0] || 'Raydium',
+        sellDex: indirectQuote.route[0] || 'Orca',
         buyPrice: directQuote.pricePerToken,
         sellPrice: 1 / indirectQuote.pricePerToken,
         priceDiffPct: profitPct,
@@ -175,19 +87,6 @@ async function scanCrossDexArbitrage(
         timestamp: Date.now(),
         confidence,
       },
-    ];
-  }
-
-  // No real profit — but in simulation mode emit occasional demo opportunities
-  if (config.tradingMode === 'simulation' && Math.random() < 0.25) {
-    return [
-      generateSimulatedOpportunity(
-        baseToken,
-        quoteToken,
-        directQuote.pricePerToken,
-        tradeAmountUSD,
-        'cross-dex'
-      ),
     ];
   }
 
@@ -208,26 +107,16 @@ async function scanTriangularArbitrage(
       : startAmountUSD;
 
   const quoteAB = await getJupiterQuote(
-    tokenA,
-    tokenB,
+    tokenA, tokenB,
     toLamports(startAmountA, tokenA.decimals),
     config.slippageBps
   );
-
-  if (!quoteAB) {
-    if (config.tradingMode === 'simulation' && Math.random() < 0.15) {
-      return [
-        generateSimulatedOpportunity(tokenA, tokenC, solPriceUSD, startAmountUSD, 'triangular'),
-      ];
-    }
-    return [];
-  }
+  if (!quoteAB) return [];
 
   const amountB = parseInt(quoteAB.outputAmount) / Math.pow(10, tokenB.decimals);
 
   const quoteBC = await getJupiterQuote(
-    tokenB,
-    tokenC,
+    tokenB, tokenC,
     toLamports(amountB, tokenB.decimals),
     config.slippageBps
   );
@@ -236,8 +125,7 @@ async function scanTriangularArbitrage(
   const amountC = parseInt(quoteBC.outputAmount) / Math.pow(10, tokenC.decimals);
 
   const quoteCA = await getJupiterQuote(
-    tokenC,
-    tokenA,
+    tokenC, tokenA,
     toLamports(amountC, tokenC.decimals),
     config.slippageBps
   );
@@ -270,13 +158,6 @@ async function scanTriangularArbitrage(
         timestamp: Date.now(),
         confidence,
       },
-    ];
-  }
-
-  // Simulation demo
-  if (config.tradingMode === 'simulation' && Math.random() < 0.15) {
-    return [
-      generateSimulatedOpportunity(tokenA, tokenC, solPriceUSD, startAmountUSD, 'triangular'),
     ];
   }
 
