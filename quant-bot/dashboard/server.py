@@ -1,99 +1,68 @@
 """
-Dashboard WebSocket server — runs in a background thread inside main.py.
-Broadcasts bot state to all connected browser clients every second.
+Dashboard server — simple HTTP + Server-Sent Events (no WebSocket, no async).
+Compatible with Python 3.9+. No extra dependencies beyond stdlib + fastapi.
 """
 
-import asyncio
 import json
 import logging
 import threading
-from typing import Set, Callable
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-import uvicorn
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Optional
 import os
 
 log = logging.getLogger(__name__)
 
-app = FastAPI()
-
-# Shared state — written by the bot loop, read by WebSocket broadcaster
 _state: dict = {}
-_clients: Set[WebSocket] = set()
-_lock = asyncio.Lock()
+_state_lock = threading.Lock()
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__))
-
-
-@app.get("/")
-async def index():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await ws.accept()
-    _clients.add(ws)
-    log.info("Dashboard client connected (%d total)", len(_clients))
-    try:
-        # Send current state immediately on connect
-        if _state:
-            await ws.send_text(json.dumps(_state))
-        while True:
-            await ws.receive_text()   # keep-alive; client sends pings
-    except WebSocketDisconnect:
-        pass
-    finally:
-        _clients.discard(ws)
-
-
-async def _broadcast(data: dict):
-    if not _clients:
-        return
-    msg = json.dumps(data)
-    dead = set()
-    for ws in list(_clients):
-        try:
-            await ws.send_text(msg)
-        except Exception:
-            dead.add(ws)
-    _clients.difference_update(dead)
+STATIC_DIR = os.path.dirname(__file__)
 
 
 def push_state(state: dict):
-    """Call from the bot's sync loop to broadcast updated state."""
-    _state.update(state)
-    try:
-        loop = _get_loop()
-        asyncio.run_coroutine_threadsafe(_broadcast(state), loop)
-    except Exception as e:
-        log.debug("Dashboard push error: %s", e)
+    """Called from the bot loop every tick to update shared state."""
+    with _state_lock:
+        _state.update(state)
 
 
-_loop: asyncio.AbstractEventLoop | None = None
+class Handler(BaseHTTPRequestHandler):
 
+    def log_message(self, format, *args):
+        pass  # silence access logs
 
-def _get_loop() -> asyncio.AbstractEventLoop:
-    global _loop
-    if _loop is None:
-        raise RuntimeError("Dashboard loop not started")
-    return _loop
+    def do_GET(self):
+        if self.path == "/" or self.path == "/index.html":
+            self._serve_file(os.path.join(STATIC_DIR, "index.html"), "text/html")
+        elif self.path == "/state":
+            self._serve_state()
+        else:
+            self.send_error(404)
+
+    def _serve_file(self, path: str, content_type: str):
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except FileNotFoundError:
+            self.send_error(404)
+
+    def _serve_state(self):
+        with _state_lock:
+            data = json.dumps(_state).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
 
 def start(host: str = "0.0.0.0", port: int = 8765):
-    """Start the dashboard server in a background daemon thread."""
-
-    def _run():
-        global _loop
-        _loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(_loop)
-        config = uvicorn.Config(app, host=host, port=port, loop="none",
-                                log_level="warning", access_log=False)
-        server = uvicorn.Server(config)
-        _loop.run_until_complete(server.serve())
-
-    t = threading.Thread(target=_run, daemon=True, name="dashboard")
+    server = HTTPServer((host, port), Handler)
+    t = threading.Thread(target=server.serve_forever, daemon=True, name="dashboard")
     t.start()
     log.info("Dashboard running at http://localhost:%d", port)
