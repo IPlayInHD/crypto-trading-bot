@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "arbitrage-client"
 version = "0.1.0"
@@ -20,7 +22,3 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 borsh = "0.10"
 bincode = "1"
-
-[dependencies.arbitrage]
-path = "../programs/arbitrage"
-features = ["no-entrypoint"]
