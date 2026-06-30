@@ -1,7 +1,7 @@
 import logging
 import uuid
 import pandas as pd
-import ta
+import talib
 from dataclasses import dataclass
 from typing import Optional, Dict
 import config
@@ -30,27 +30,29 @@ class MeanReversionStrategy:
         if df is None or len(df) < config.BB_PERIOD + 5:
             return None
 
-        df    = df.copy()
-        bb    = ta.volatility.BollingerBands(df["close"], window=config.BB_PERIOD, window_dev=config.BB_STD)
-        df["bbl"] = bb.bollinger_lband()
-        df["bbm"] = bb.bollinger_mavg()
-        df["rsi"] = ta.momentum.RSIIndicator(df["close"], window=14).rsi()
+        close = df["close"].values
+        upper, middle, lower = talib.BBANDS(close, timeperiod=config.BB_PERIOD,
+                                            nbdevup=config.BB_STD, nbdevdn=config.BB_STD)
+        rsi = talib.RSI(close, timeperiod=14)
 
-        last  = df.iloc[-1]
-        price = last["close"]
-
-        if pd.isna(last["bbl"]) or pd.isna(last["rsi"]):
+        import math
+        if any(math.isnan(v) for v in [lower[-1], middle[-1], rsi[-1]]):
             return None
-        if not (price <= last["bbl"] * 1.002 and last["rsi"] < config.MR_RSI_ENTRY):
+
+        price = float(close[-1])
+        bbl   = float(lower[-1])
+        bbm   = float(middle[-1])
+
+        if not (price <= bbl * 1.002 and rsi[-1] < config.MR_RSI_ENTRY):
             return None
 
         sl   = round(price * (1 - config.MR_SL_PCT), 8)
         size = max(min(available_usd * config.MAX_POSITION_PCT, available_usd * 0.25), config.MIN_ORDER_USD)
 
-        log.info("[MR] Signal %s entry=%.6f target=%.6f sl=%.6f rsi=%.1f", pair, price, last["bbm"], sl, last["rsi"])
+        log.info("[MR] Signal %s entry=%.6f target=%.6f sl=%.6f rsi=%.1f", pair, price, bbm, sl, rsi[-1])
         return {"id": str(uuid.uuid4())[:8], "pair": pair, "strategy": "mean_reversion",
-                "side": "buy", "entry": price, "stop_loss": sl, "take_profit": last["bbm"],
-                "size_usd": size, "reason": f"BB lower RSI={last['rsi']:.1f}"}
+                "side": "buy", "entry": price, "stop_loss": sl, "take_profit": bbm,
+                "size_usd": size, "reason": f"BB lower RSI={rsi[-1]:.1f}"}
 
     def open_position(self, signal: dict):
         self.positions[signal["pair"]] = MRPosition(
@@ -64,11 +66,12 @@ class MeanReversionStrategy:
         target = pos.target
 
         if df is not None and len(df) >= config.BB_PERIOD:
-            df    = df.copy()
-            bb    = ta.volatility.BollingerBands(df["close"], window=config.BB_PERIOD, window_dev=config.BB_STD)
-            mavg  = bb.bollinger_mavg().iloc[-1]
-            if not pd.isna(mavg):
-                target = mavg
+            close = df["close"].values
+            upper, middle, lower = talib.BBANDS(close, timeperiod=config.BB_PERIOD,
+                                                nbdevup=config.BB_STD, nbdevdn=config.BB_STD)
+            import math
+            if not math.isnan(middle[-1]):
+                target = float(middle[-1])
 
         reason = None
         if price <= pos.stop_loss:

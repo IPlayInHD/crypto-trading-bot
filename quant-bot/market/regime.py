@@ -1,5 +1,5 @@
 import pandas as pd
-import ta
+import talib
 import logging
 from typing import Dict
 
@@ -16,22 +16,30 @@ def detect(df: pd.DataFrame) -> str:
     if df is None or len(df) < 30:
         return UNKNOWN
     try:
-        df = df.copy()
-        df["adx"]      = ta.trend.ADXIndicator(df["high"], df["low"], df["close"], window=14).adx()
-        df["ema_fast"] = ta.trend.EMAIndicator(df["close"], window=9).ema_indicator()
-        df["ema_slow"] = ta.trend.EMAIndicator(df["close"], window=21).ema_indicator()
-        bb             = ta.volatility.BollingerBands(df["close"], window=20, window_dev=2)
-        df["bbw"]      = bb.bollinger_wband()
+        close = df["close"].values
+        high  = df["high"].values
+        low   = df["low"].values
 
-        last    = df.iloc[-1]
-        adx     = last["adx"]
-        bbw     = last["bbw"]
-        med_bbw = df["bbw"].median()
+        adx      = talib.ADX(high, low, close, timeperiod=14)
+        ema_fast = talib.EMA(close, timeperiod=9)
+        ema_slow = talib.EMA(close, timeperiod=21)
+        upper, middle, lower = talib.BBANDS(close, timeperiod=20, nbdevup=2, nbdevdn=2)
+        bbw = (upper - lower) / middle  # Bollinger Band Width
 
-        if bbw > 1.5 * med_bbw:
+        last_adx      = adx[-1]
+        last_ema_fast = ema_fast[-1]
+        last_ema_slow = ema_slow[-1]
+        last_bbw      = bbw[-1]
+        med_bbw       = float(pd.Series(bbw).median())
+
+        import math
+        if any(math.isnan(v) for v in [last_adx, last_ema_fast, last_ema_slow, last_bbw, med_bbw]):
+            return UNKNOWN
+
+        if last_bbw > 1.5 * med_bbw:
             return VOLATILE
-        if adx > 25:
-            return TRENDING_UP if last["ema_fast"] > last["ema_slow"] else TRENDING_DOWN
+        if last_adx > 25:
+            return TRENDING_UP if last_ema_fast > last_ema_slow else TRENDING_DOWN
         return RANGING
     except Exception as e:
         log.debug("Regime error: %s", e)

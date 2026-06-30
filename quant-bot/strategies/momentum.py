@@ -1,7 +1,7 @@
 import logging
 import uuid
 import pandas as pd
-import ta
+import talib
 from dataclasses import dataclass
 from typing import Optional, Dict
 import config
@@ -30,29 +30,34 @@ class MomentumStrategy:
         if df is None or len(df) < config.EMA_SLOW + 5:
             return None
 
-        df = df.copy()
-        df["ema_fast"] = ta.trend.EMAIndicator(df["close"], window=config.EMA_FAST).ema_indicator()
-        df["ema_slow"] = ta.trend.EMAIndicator(df["close"], window=config.EMA_SLOW).ema_indicator()
-        df["rsi"]      = ta.momentum.RSIIndicator(df["close"], window=config.RSI_PERIOD).rsi()
-        df["atr"]      = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"], window=14).average_true_range()
+        close    = df["close"].values
+        high     = df["high"].values
+        low      = df["low"].values
+        ema_fast = talib.EMA(close, timeperiod=config.EMA_FAST)
+        ema_slow = talib.EMA(close, timeperiod=config.EMA_SLOW)
+        rsi      = talib.RSI(close, timeperiod=config.RSI_PERIOD)
+        atr      = talib.ATR(high, low, close, timeperiod=14)
 
-        prev, last = df.iloc[-2], df.iloc[-1]
-        crossed_up = prev["ema_fast"] <= prev["ema_slow"] and last["ema_fast"] > last["ema_slow"]
-        rsi_ok     = config.RSI_BUY_MIN <= last["rsi"] <= config.RSI_BUY_MAX
+        import math
+        if any(math.isnan(v) for v in [ema_fast[-1], ema_fast[-2], ema_slow[-1], ema_slow[-2], rsi[-1], atr[-1]]):
+            return None
+
+        crossed_up = ema_fast[-2] <= ema_slow[-2] and ema_fast[-1] > ema_slow[-1]
+        rsi_ok     = config.RSI_BUY_MIN <= rsi[-1] <= config.RSI_BUY_MAX
 
         if not (crossed_up and rsi_ok):
             return None
 
-        price = last["close"]
-        atr   = last["atr"]
-        sl    = round(price - config.MOMENTUM_SL_ATR * atr, 8)
-        tp    = round(price + config.MOMENTUM_TP_ATR * atr, 8)
+        price = float(close[-1])
+        atr_v = float(atr[-1])
+        sl    = round(price - config.MOMENTUM_SL_ATR * atr_v, 8)
+        tp    = round(price + config.MOMENTUM_TP_ATR * atr_v, 8)
         size  = max(min(available_usd * config.MAX_POSITION_PCT, available_usd * 0.25), config.MIN_ORDER_USD)
 
-        log.info("[MOM] Signal %s entry=%.6f sl=%.6f tp=%.6f rsi=%.1f", pair, price, sl, tp, last["rsi"])
+        log.info("[MOM] Signal %s entry=%.6f sl=%.6f tp=%.6f rsi=%.1f", pair, price, sl, tp, rsi[-1])
         return {"id": str(uuid.uuid4())[:8], "pair": pair, "strategy": "momentum",
                 "side": "buy", "entry": price, "stop_loss": sl, "take_profit": tp,
-                "size_usd": size, "reason": f"EMA cross RSI={last['rsi']:.1f}"}
+                "size_usd": size, "reason": f"EMA cross RSI={rsi[-1]:.1f}"}
 
     def open_position(self, signal: dict):
         self.positions[signal["pair"]] = MomentumPosition(
@@ -70,11 +75,13 @@ class MomentumStrategy:
         elif price >= pos.take_profit:
             reason = "take_profit"
         elif df is not None and len(df) >= config.EMA_SLOW + 2:
-            df         = df.copy()
-            df["ef"]   = ta.trend.EMAIndicator(df["close"], window=config.EMA_FAST).ema_indicator()
-            df["es"]   = ta.trend.EMAIndicator(df["close"], window=config.EMA_SLOW).ema_indicator()
-            if df.iloc[-1]["ef"] < df.iloc[-1]["es"]:
-                reason = "ema_reversal"
+            close    = df["close"].values
+            ema_fast = talib.EMA(close, timeperiod=config.EMA_FAST)
+            ema_slow = talib.EMA(close, timeperiod=config.EMA_SLOW)
+            import math
+            if not math.isnan(ema_fast[-1]) and not math.isnan(ema_slow[-1]):
+                if ema_fast[-1] < ema_slow[-1]:
+                    reason = "ema_reversal"
 
         if reason is None:
             return None
