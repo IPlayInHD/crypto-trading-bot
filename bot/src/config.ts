@@ -161,6 +161,72 @@ export const TOKENS = {
     decimals: 6,
     name: 'Port Finance',
   },
+  RENDER: {
+    symbol: 'RENDER',
+    mint: 'rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof',
+    decimals: 8,
+    name: 'Render Token',
+  },
+  HNT: {
+    symbol: 'HNT',
+    mint: 'hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux',
+    decimals: 8,
+    name: 'Helium',
+  },
+  MOBILE: {
+    symbol: 'MOBILE',
+    mint: 'mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6',
+    decimals: 6,
+    name: 'Helium Mobile',
+  },
+  IOT: {
+    symbol: 'IOT',
+    mint: 'iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns',
+    decimals: 6,
+    name: 'Helium IOT',
+  },
+  ZEUS: {
+    symbol: 'ZEUS',
+    mint: 'ZEUS1aR7aX8DFFkEiMZiATY9muYpTnu36UnmZxHgEGt',
+    decimals: 6,
+    name: 'Zeus Network',
+  },
+  POPCAT: {
+    symbol: 'POPCAT',
+    mint: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',
+    decimals: 9,
+    name: 'Popcat',
+  },
+  MEW: {
+    symbol: 'MEW',
+    mint: 'MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5',
+    decimals: 5,
+    name: 'cat in a dogs world',
+  },
+  TRUMP: {
+    symbol: 'TRUMP',
+    mint: '6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN',
+    decimals: 6,
+    name: 'Official Trump',
+  },
+  FARTCOIN: {
+    symbol: 'FARTCOIN',
+    mint: '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump',
+    decimals: 6,
+    name: 'Fartcoin',
+  },
+  PENGU: {
+    symbol: 'PENGU',
+    mint: '2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv',
+    decimals: 6,
+    name: 'Pudgy Penguins',
+  },
+  AI16Z: {
+    symbol: 'AI16Z',
+    mint: 'HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC',
+    decimals: 6,
+    name: 'ai16z',
+  },
 };
 
 // Token pairs to scan for arbitrage (expanded from 7 to 30 pairs)
@@ -206,6 +272,29 @@ export const SCAN_PAIRS = [
   { base: TOKENS.BONK, quote: TOKENS.SOL },
   { base: TOKENS.WIF, quote: TOKENS.SOL },
   { base: TOKENS.MNGO, quote: TOKENS.USDC },
+
+  // Infrastructure tokens
+  { base: TOKENS.RENDER, quote: TOKENS.USDC },
+  { base: TOKENS.RENDER, quote: TOKENS.SOL },
+  { base: TOKENS.HNT, quote: TOKENS.USDC },
+  { base: TOKENS.HNT, quote: TOKENS.SOL },
+  { base: TOKENS.MOBILE, quote: TOKENS.USDC },
+  { base: TOKENS.IOT, quote: TOKENS.USDC },
+  { base: TOKENS.ZEUS, quote: TOKENS.USDC },
+  { base: TOKENS.ZEUS, quote: TOKENS.SOL },
+  { base: TOKENS.AI16Z, quote: TOKENS.USDC },
+  { base: TOKENS.AI16Z, quote: TOKENS.SOL },
+
+  // High volume meme tokens
+  { base: TOKENS.POPCAT, quote: TOKENS.USDC },
+  { base: TOKENS.POPCAT, quote: TOKENS.SOL },
+  { base: TOKENS.MEW, quote: TOKENS.USDC },
+  { base: TOKENS.MEW, quote: TOKENS.SOL },
+  { base: TOKENS.TRUMP, quote: TOKENS.USDC },
+  { base: TOKENS.TRUMP, quote: TOKENS.SOL },
+  { base: TOKENS.FARTCOIN, quote: TOKENS.USDC },
+  { base: TOKENS.PENGU, quote: TOKENS.USDC },
+  { base: TOKENS.PENGU, quote: TOKENS.SOL },
 ];
 
 // Triangular arbitrage paths (expanded)
@@ -230,4 +319,15 @@ export const TRIANGULAR_PATHS = [
   [TOKENS.RAY, TOKENS.USDC, TOKENS.USDT],
   [TOKENS.ORCA, TOKENS.USDC, TOKENS.SOL],
   [TOKENS.JUP, TOKENS.USDC, TOKENS.SOL],
+
+  // Meme triangular
+  [TOKENS.WIF, TOKENS.USDC, TOKENS.BONK],
+  [TOKENS.POPCAT, TOKENS.USDC, TOKENS.SOL],
+  [TOKENS.TRUMP, TOKENS.USDC, TOKENS.SOL],
+  [TOKENS.MEW, TOKENS.USDC, TOKENS.SOL],
+
+  // Infrastructure triangular
+  [TOKENS.RENDER, TOKENS.USDC, TOKENS.SOL],
+  [TOKENS.HNT, TOKENS.USDC, TOKENS.SOL],
+  [TOKENS.AI16Z, TOKENS.USDC, TOKENS.SOL],
 ];
